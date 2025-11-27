@@ -1,0 +1,9 @@
+## Interface: 120000,110207,110205
+## Title: GatherMate2 Zone Tracker
+## Notes: Tracks visited zones with MapID for GatherMate2 Storage configuration
+## Author: Kriemhilde - EU-Aegwynn
+## Version: 1.0
+## Category-enUS: Map
+## Category-deDE: Karte
+## SavedVariables: GM2ZoneTrackerDB
+GatherMate2ZoneTracker.lua
