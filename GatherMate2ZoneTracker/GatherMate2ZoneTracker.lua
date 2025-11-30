@@ -246,6 +246,197 @@ function GM2ZT:ResizeCoordFrame()
 end
 
 -- ========================================
+-- Export Frame
+-- ========================================
+
+function GM2ZT:CreateExportFrame()
+	if self.exportFrame then
+		return self.exportFrame
+	end
+
+	local frame = CreateFrame("Frame", "GM2ZT_ExportFrame", UIParent, "BackdropTemplate")
+	frame:SetSize(700, 600)
+	frame:SetPoint("CENTER")
+	frame:SetFrameStrata("DIALOG")
+	frame:SetFrameLevel(100)
+
+	frame:SetBackdrop({
+		bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+		edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+		tile = true,
+		tileSize = 32,
+		edgeSize = 32,
+		insets = { left = 8, right = 8, top = 8, bottom = 8 }
+	})
+	frame:SetBackdropColor(0, 0, 0, 1)
+
+	frame:SetMovable(true)
+	frame:EnableMouse(true)
+	frame:RegisterForDrag("LeftButton")
+	frame:SetScript("OnDragStart", frame.StartMoving)
+	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+	frame:Hide()
+
+	-- Title
+	local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	title:SetPoint("TOP", 0, -16)
+	title:SetText("GM2 Zone Tracker - Export for TOC")
+
+	-- ScrollFrame for the text
+	local scrollFrame = CreateFrame("ScrollFrame", "GM2ZT_ExportScrollFrame", frame, "UIPanelScrollFrameTemplate")
+	scrollFrame:SetPoint("TOPLEFT", 16, -45)
+	scrollFrame:SetPoint("BOTTOMRIGHT", -32, 55)
+
+	-- EditBox for the content
+	local editBox = CreateFrame("EditBox", "GM2ZT_ExportEditBox", scrollFrame)
+	editBox:SetMultiLine(true)
+	editBox:SetAutoFocus(false)
+	editBox:SetMaxLetters(0)
+	editBox:SetFontObject(ChatFontNormal)
+	editBox:SetWidth(650)
+
+	-- Enable text selection
+	editBox:SetScript("OnEscapePressed", function(self)
+		self:ClearFocus()
+	end)
+
+	scrollFrame:SetScrollChild(editBox)
+
+	-- Select All button
+	local selectAllBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	selectAllBtn:SetSize(120, 25)
+	selectAllBtn:SetPoint("BOTTOMLEFT", 16, 16)
+	selectAllBtn:SetText("Select All")
+	selectAllBtn:SetScript("OnClick", function()
+		editBox:SetFocus()
+		editBox:HighlightText()
+	end)
+
+	-- Close button
+	local closeBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	closeBtn:SetSize(80, 25)
+	closeBtn:SetPoint("BOTTOMRIGHT", -16, 16)
+	closeBtn:SetText("Close")
+	closeBtn:SetScript("OnClick", function()
+		editBox:ClearFocus()
+		frame:Hide()
+	end)
+
+	frame.editBox = editBox
+	frame.scrollFrame = scrollFrame
+	self.exportFrame = frame
+
+	return frame
+end
+
+function GM2ZT:ShowExportData()
+	print("|cFF00FF00GM2 ZoneTracker:|r Export function called...")
+
+	local frame = self:CreateExportFrame()
+	if not frame then
+		print("|cFFFF0000GM2 ZoneTracker:|r Failed to create export frame!")
+		return
+	end
+
+	-- Check if database has data
+	if not GM2ZoneTrackerDB or not next(GM2ZoneTrackerDB) then
+		print("|cFFFF0000GM2 ZoneTracker:|r No zones tracked yet!")
+		frame.editBox:SetText("No zones tracked yet!\n\nVisit some zones first, then use /gm2zones export again.")
+		frame.editBox:SetHeight(200)
+		frame.editBox:SetCursorPosition(0)
+		frame:Show()
+		return
+	end
+
+	print("|cFF00FF00GM2 ZoneTracker:|r Building export data...")
+
+	local output = {}
+
+	-- Sort expansions
+	local sortedExpansions = {}
+	for expansion in pairs(GM2ZoneTrackerDB) do
+		table.insert(sortedExpansions, expansion)
+	end
+	table.sort(sortedExpansions)
+
+	print(string.format("|cFF00FF00GM2 ZoneTracker:|r Found %d expansions", #sortedExpansions))
+
+	-- Header
+	table.insert(output, "==============================================")
+	table.insert(output, "GM2 ZONE TRACKER EXPORT FOR TOC FILE")
+	table.insert(output, "==============================================")
+	table.insert(output, "")
+	table.insert(output, "Copy the X-GM2-Storage-Zones lines below into your TOC file.")
+	table.insert(output, "")
+
+	-- Generate TOC format
+	for _, expansion in ipairs(sortedExpansions) do
+		local zones = GM2ZoneTrackerDB[expansion]
+
+		-- Collect and sort IDs
+		local sortedIDs = {}
+		for mapID in pairs(zones) do
+			table.insert(sortedIDs, mapID)
+		end
+		table.sort(sortedIDs)
+
+		-- X-GM2-Storage-Zones line
+		local idsString = table.concat(sortedIDs, ", ")
+		table.insert(output, string.format("## X-GM2-Storage-Zones-%s: %s", expansion, idsString))
+	end
+
+	table.insert(output, "")
+	table.insert(output, "==============================================")
+	table.insert(output, "ZONE DETAILS (FOR NOTES)")
+	table.insert(output, "==============================================")
+	table.insert(output, "")
+
+	-- Zone details for notes
+	for _, expansion in ipairs(sortedExpansions) do
+		local zones = GM2ZoneTrackerDB[expansion]
+		table.insert(output, "")
+		table.insert(output, string.format("=== %s ===", expansion))
+
+		-- Sort by MapID
+		local sortedIDs = {}
+		for mapID in pairs(zones) do
+			table.insert(sortedIDs, mapID)
+		end
+		table.sort(sortedIDs)
+
+		for _, mapID in ipairs(sortedIDs) do
+			local zone = zones[mapID]
+			table.insert(output, string.format("  %d: %s (Parent: %s [%s])",
+				mapID, zone.name or "Unknown", zone.parent or "None", tostring(zone.parentID or "nil")))
+		end
+	end
+
+	table.insert(output, "")
+	table.insert(output, "==============================================")
+
+	local fullText = table.concat(output, "\n")
+	local editBox = frame.editBox
+
+	-- Calculate height based on number of lines
+	local numLines = #output
+	local lineHeight = 14
+	local textHeight = math.max(500, numLines * lineHeight)
+
+	print(string.format("|cFF00FF00GM2 ZoneTracker:|r Setting text: %d lines, %d characters, height: %d", numLines, #fullText, textHeight))
+
+	-- Set the text
+	editBox:SetText(fullText)
+	editBox:SetHeight(textHeight)
+	editBox:SetCursorPosition(0)
+
+	print("|cFF00FF00GM2 ZoneTracker:|r Text set successfully. Showing frame...")
+
+	frame:Show()
+
+	print("|cFF00FF00GM2 ZoneTracker:|r Export window opened! Use 'Select All' button or click in the box and press CTRL+A, then CTRL+C to copy.")
+end
+
+-- ========================================
 -- Options Panel
 -- ========================================
 
@@ -339,15 +530,11 @@ SlashCmdList["GM2ZONES"] = function(msg)
 	end
 
 	if msg == "export" then
-		-- Print in TOC format for easy copy
-		print("|cFF00FF00GM2 ZoneTracker:|r Export for TOC files:")
-		for expansion, zones in pairs(GM2ZoneTrackerDB) do
-			local ids = {}
-			for mapID in pairs(zones) do
-				table.insert(ids, mapID)
-			end
-			table.sort(ids)
-			print(string.format("|cFFFFD200%s:|r %s", expansion, table.concat(ids, ", ")))
+		local success, err = pcall(function()
+			GM2ZT:ShowExportData()
+		end)
+		if not success then
+			print("|cFFFF0000GM2 ZoneTracker Error:|r " .. tostring(err))
 		end
 		return
 	end
