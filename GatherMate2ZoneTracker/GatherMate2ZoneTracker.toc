@@ -2,8 +2,17 @@
 ## Title: GatherMate2 Zone Tracker
 ## Notes: Tracks visited zones with MapID for GatherMate2 Storage configuration
 ## Author: Kriemhilde - EU-Aegwynn
-## Version: 1.0
+## Version: 1.1
 ## Category-enUS: Map
 ## Category-deDE: Karte
 ## SavedVariables: GM2ZoneTrackerDB
+
+# Ace3 Libraries
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+Libs\AceAddon-3.0\AceAddon-3.0.xml
+Libs\AceDB-3.0\AceDB-3.0.xml
+Libs\AceConfig-3.0\AceConfig-3.0.xml
+Libs\AceGUI-3.0\AceGUI-3.0.xml
+
+# Core
 GatherMate2ZoneTracker.lua
